@@ -7,6 +7,7 @@ export function useStore() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [newOrders, setNewOrders] = useState<string[]>([]);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -81,6 +82,7 @@ export function useStore() {
     const ordersSubscription = supabase
       .channel('orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        console.debug('[useStore] orders subscription payload:', payload);
         if (payload.eventType === 'INSERT') {
           const newOrder = payload.new;
           setOrders(prev => [{
@@ -96,6 +98,62 @@ export function useStore() {
             assignedDriver: newOrder.assigned_driver,
             createdAt: newOrder.created_at,
           }, ...prev]);
+          // Mark as new and notify admin users via the Browser Notification API + in-app event
+          setNewOrders(prev => {
+            if (prev.includes(newOrder.id)) return prev;
+            return [newOrder.id, ...prev];
+          });
+          // dispatch in-app event so UI can show toast or other indicator
+          try {
+            window.dispatchEvent(new CustomEvent('grocery:new-order', { detail: { id: newOrder.id, customerName: newOrder.customer_name, total: newOrder.total } }));
+          } catch (_) {}
+
+          // play short beep using Web Audio
+          try {
+            if (typeof window !== 'undefined' && typeof AudioContext !== 'undefined') {
+              const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const o = ctx.createOscillator();
+              const g = ctx.createGain();
+              o.type = 'sine';
+              o.frequency.value = 880;
+              g.gain.value = 0.05;
+              o.connect(g);
+              g.connect(ctx.destination);
+              o.start();
+              setTimeout(() => { o.stop(); ctx.close(); }, 120);
+            }
+          } catch (_) {}
+
+          // Notify via Notification API if admin (existing logic)
+          (async () => {
+            try {
+              if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
+              const { data: sessionData } = await supabase.auth.getSession();
+              const authUser = sessionData?.session?.user;
+              if (!authUser) return;
+
+              const { data: custData } = await supabase.from('customers').select('is_admin').eq('id', authUser.id).single();
+              if (!custData || !custData.is_admin) return;
+
+              if (Notification.permission === 'default') {
+                await Notification.requestPermission();
+              }
+
+              if (Notification.permission === 'granted') {
+                const title = 'New Order Received';
+                const body = `${newOrder.customer_name} — $${(newOrder.total || 0).toFixed(2)}`;
+                try {
+                  // eslint-disable-next-line no-new
+                  new Notification(title, { body, tag: newOrder.id });
+                } catch (err) {
+                  // Notification may fail silently in some environments
+                  console.warn('Notification failed:', err);
+                }
+              }
+            } catch (err) {
+              console.error('Error checking admin or sending notification:', err);
+            }
+          })();
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new;
           setOrders(prev => prev.map(o => o.id === updated.id ? {
@@ -114,6 +172,9 @@ export function useStore() {
         }
       })
       .subscribe();
+    ordersSubscription.on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+      console.debug('[useStore] ordersSubscription active');
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -365,6 +426,14 @@ export function useStore() {
     return orders.filter(order => order.status === 'pending').length;
   }, [orders]);
 
+  const getNewOrdersCount = useCallback(() => {
+    return newOrders.length;
+  }, [newOrders]);
+
+  const clearNewOrders = useCallback(() => {
+    setNewOrders([]);
+  }, []);
+
   return {
     products,
     cart,
@@ -387,5 +456,7 @@ export function useStore() {
     updateStock,
     getMyOrders,
     getPendingOrdersCount,
+    getNewOrdersCount,
+    clearNewOrders,
   };
 }

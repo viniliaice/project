@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Product, CartItem } from '../types';
+import { Product, CartItem, Page } from '../types';
 import { categories } from '../data/products';
 
 interface ShopPageProps {
@@ -8,10 +8,10 @@ interface ShopPageProps {
   onAddToCart: (product: Product) => void;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   isLoading: boolean;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: Page) => void;
 }
 
-export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoading }: ShopPageProps) {
+export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoading, onNavigate }: ShopPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 

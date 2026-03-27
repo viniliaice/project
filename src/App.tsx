@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { Page } from './types';
 import { Header } from './components/Header';
@@ -9,20 +9,37 @@ import { OrderSuccessPage } from './components/OrderSuccessPage';
 import { MyOrdersPage } from './components/MyOrdersPage';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthProvider } from './context/AuthContext';
-
+import { OrderToast } from './components/OrderToast';
+ 
 function App() {
+
   const [currentPage, setCurrentPage] = useState<Page>('shop');
   const [customerPhone, setCustomerPhone] = useState('');
   const store = useStore();
+  const [toast, setToast] = useState<{ title: string; message: string; visible: boolean }>({ title: '', message: '', visible: false });
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const d = e?.detail || {};
+      setToast({ title: 'New Order', message: `${d.customerName || ''} — $${((d.total || 0)).toFixed(2)}`, visible: true });
+      // auto hide after 4s
+      setTimeout(() => setToast(s => ({ ...s, visible: false })), 4000);
+    };
+    window.addEventListener('grocery:new-order', handler as EventListener);
+    return () => window.removeEventListener('grocery:new-order', handler as EventListener);
+  }, []);
 
   const navigateTo = (page: Page) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
+    if (page === 'admin' && store.clearNewOrders) {
+      try { store.clearNewOrders(); } catch (_) {}
+    }
   };
 
   // Derive values from store
   const cartCount = store.getCartItemCount();
-  const newOrderCount = store.getPendingOrdersCount();
+  const newOrderCount = store.getNewOrdersCount ? store.getNewOrdersCount() : store.getPendingOrdersCount();
 
   const handlePlaceOrder = async (customerData: {
     name: string;
@@ -125,6 +142,7 @@ function App() {
         />
         <main className="pb-20 md:pb-8">
           {renderPage()}
+          <OrderToast visible={toast.visible} title={toast.title} message={toast.message} onClose={() => setToast(s => ({ ...s, visible: false }))} />
         </main>
       </div>
     </AuthProvider>

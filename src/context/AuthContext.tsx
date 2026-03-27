@@ -73,7 +73,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase.from('customers').select('is_admin').eq('id', uid).single();
       if (!error && data) {
-        setIsAdmin(Boolean((data as any).is_admin));
+        const adminFlag = Boolean((data as any).is_admin);
+        setIsAdmin(adminFlag);
+        try {
+          if (adminFlag && typeof window !== 'undefined' && typeof Notification !== 'undefined') {
+            if (Notification.permission === 'default') {
+              await Notification.requestPermission();
+            }
+          }
+        } catch (_) {}
       } else {
         setIsAdmin(false);
       }
