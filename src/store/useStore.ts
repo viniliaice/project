@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Product, CartItem, Order, OrderStatus, OrderItem } from '../types';
+import { Product, CartItem, Order, OrderStatus } from '../types';
 import { initialProducts } from '../data/products';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +10,50 @@ export function useStore() {
   const [newOrders, setNewOrders] = useState<string[]>([]);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshOrders = useCallback(async () => {
+    try {
+      const { data: ordersData, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('refreshOrders error', error);
+        return;
+      }
+
+      if (ordersData) {
+        setOrders(ordersData.map((order: any) => ({
+          id: order.id,
+          customerName: order.customer_name,
+          customerPhone: order.customer_phone,
+          deliveryLocation: order.delivery_location,
+          items: order.items,
+          total: order.total,
+          status: order.status,
+          paymentMethod: order.payment_method,
+          notes: order.notes || '',
+          assignedDriver: order.assigned_driver,
+          createdAt: order.created_at,
+        })));
+      }
+    } catch (err) {
+      console.error('refreshOrders failed', err);
+    }
+  }, []);
+
+  const mapDbProduct = (p: any): Product => ({
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    icon: p.icon,
+    category: p.category,
+    unit: p.unit,
+    stock: p.stock,
+    lowStock: p.low_stock ?? p.lowStock ?? 0,
+    description: p.description ?? '',
+  });
 
   useEffect(() => {
     const initializeStore = async () => {
@@ -32,31 +76,13 @@ export function useStore() {
             }))
           );
           const { data: newProducts } = await supabase.from('products').select('*');
-          setProducts(newProducts || []);
+          setProducts((newProducts || []).map(mapDbProduct));
         } else {
-          setProducts(data);
+          setProducts(data.map(mapDbProduct));
         }
 
-        const { data: ordersData } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (ordersData) {
-          setOrders(ordersData.map(order => ({
-            id: order.id,
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
-            deliveryLocation: order.delivery_location,
-            items: order.items,
-            total: order.total,
-            status: order.status,
-            paymentMethod: order.payment_method,
-            notes: order.notes || '',
-            assignedDriver: order.assigned_driver,
-            createdAt: order.created_at,
-          })));
-        }
+        // Load orders using refreshOrders so it can be reused elsewhere
+        await refreshOrders();
       } catch (error) {
         console.error('Error initializing store:', error);
       } finally {
@@ -70,9 +96,11 @@ export function useStore() {
       .channel('products')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setProducts(prev => [...prev, payload.new]);
+          const np = mapDbProduct(payload.new);
+          setProducts(prev => [...prev, np]);
         } else if (payload.eventType === 'UPDATE') {
-          setProducts(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+          const np = mapDbProduct(payload.new);
+          setProducts(prev => prev.map(p => p.id === np.id ? np : p));
         } else if (payload.eventType === 'DELETE') {
           setProducts(prev => prev.filter(p => p.id !== payload.old.id));
         }
@@ -458,5 +486,6 @@ export function useStore() {
     getPendingOrdersCount,
     getNewOrdersCount,
     clearNewOrders,
+    refreshOrders,
   };
 }

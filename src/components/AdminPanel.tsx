@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Product, Order, OrderStatus, NewProduct } from '../types';
 import { categories } from '../data/products';
 import { useAuth } from '../context/AuthContext';
@@ -14,10 +14,12 @@ interface AdminPanelProps {
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onUpdateNotes: (orderId: string, notes: string) => void;
   onAssignDriver: (orderId: string, driverName: string) => void;
+  highlighted?: boolean; // Optional prop to highlight the order card
   onAddProduct: (product: Omit<Product, 'id'>) => void;
   onUpdateProduct: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct: (id: string) => void;
   onUpdateStock: (id: string, quantity: number) => void;
+  clearNewOrders?: () => void;
 }
 
 type AdminTab = 'orders' | 'products' | 'stock';
@@ -34,19 +36,51 @@ export function AdminPanel({
   onUpdateProduct,
   onDeleteProduct,
   onUpdateStock,
+  clearNewOrders,
 }: AdminPanelProps) {
   const { user, isAdmin, loading, signOut } = useAuth();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<AdminTab>('orders');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [highlightedOrder, setHighlightedOrder] = useState<string | null>(null);
+
+  // Derived values and listeners (always declared to keep hook order stable)
+  const filteredOrders = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
+
+  const pendingCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
+
+  const stats = useMemo(() => ({
+    totalOrders: orders.length,
+    pendingOrders: orders.filter(o => o.status === 'pending').length,
+    activeOrders: orders.filter(o => ['confirmed', 'out_for_delivery'].includes(o.status)).length,
+    totalRevenue: orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
+  }), [orders]);
+
+  // Listen for the in-page new-order event and highlight/expand the new order
+  useEffect(() => {
+    const handler = (e: any) => {
+      const id = e?.detail?.id;
+      if (!id) return;
+      setActiveTab('orders');
+      setExpandedOrder(id);
+      setHighlightedOrder(id);
+      // clear highlight after a few seconds
+      setTimeout(() => setHighlightedOrder(curr => (curr === id ? null : curr)), 4000);
+      // clear new-orders badge in the store if provided
+      try { clearNewOrders && clearNewOrders(); } catch (_) {}
+    };
+
+    window.addEventListener('grocery:new-order', handler as EventListener);
+    return () => window.removeEventListener('grocery:new-order', handler as EventListener);
+  }, [clearNewOrders]);
 
   if (loading) return null;
 
   if (!user) {
     return (
       <>
-        <AuthModal isOpen={true} onClose={() => setAuthModalOpen(false)} />
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="bg-white rounded-2xl p-8 shadow-sm text-center">
             <span className="text-5xl mb-4 block">🔐</span>
@@ -83,19 +117,6 @@ export function AdminPanel({
       </div>
     );
   }
-
-  const filteredOrders = statusFilter === 'all' 
-    ? orders 
-    : orders.filter(o => o.status === statusFilter);
-
-  const pendingCount = orders.filter(o => o.status === 'pending').length;
-
-  const stats = {
-    totalOrders: orders.length,
-    pendingOrders: orders.filter(o => o.status === 'pending').length,
-    activeOrders: orders.filter(o => ['confirmed', 'out_for_delivery'].includes(o.status)).length,
-    totalRevenue: orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0),
-  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 md:py-8">
@@ -135,7 +156,7 @@ export function AdminPanel({
       {/* Tab Navigation */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         <button
-          onClick={() => setActiveTab('orders')}
+          onClick={() => { setActiveTab('orders'); clearNewOrders && clearNewOrders(); }}
           className={`flex-shrink-0 px-4 py-2 rounded-xl font-medium transition flex items-center gap-2 ${
             activeTab === 'orders' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
@@ -177,6 +198,7 @@ export function AdminPanel({
           onUpdateStatus={onUpdateStatus}
           onUpdateNotes={onUpdateNotes}
           onAssignDriver={onAssignDriver}
+          highlightedOrder={highlightedOrder}
         />
       )}
       {activeTab === 'products' && (
@@ -209,8 +231,8 @@ interface OrdersTabProps {
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onUpdateNotes: (orderId: string, notes: string) => void;
   onAssignDriver: (orderId: string, driverName: string) => void;
+  highlightedOrder?: string | null;
 }
-
 function OrdersTab({
   orders,
   statusFilter,
@@ -220,6 +242,7 @@ function OrdersTab({
   onUpdateStatus,
   onUpdateNotes,
   onAssignDriver,
+  highlightedOrder,
 }: OrdersTabProps) {
   const drivers = [
     { name: 'Driver 1 - Michael' },
@@ -265,6 +288,7 @@ function OrdersTab({
               onUpdateNotes={onUpdateNotes}
               onAssignDriver={onAssignDriver}
               drivers={drivers}
+              highlighted={highlightedOrder === order.id}
             />
           ))}
         </div>
@@ -282,6 +306,7 @@ interface OrderCardProps {
   onUpdateNotes: (orderId: string, notes: string) => void;
   onAssignDriver: (orderId: string, driverName: string) => void;
   drivers: { name: string }[];
+  highlighted?: boolean;
 }
 
 function OrderCard({
@@ -292,6 +317,7 @@ function OrderCard({
   onUpdateNotes,
   onAssignDriver,
   drivers,
+  highlighted = false, // Default value for highlighted
 }: OrderCardProps) {
   const [notes, setNotes] = useState(order.notes || '');
 
@@ -307,7 +333,7 @@ function OrderCard({
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${
-      order.status === 'pending' ? 'ring-2 ring-yellow-400' : ''
+      highlighted ? 'ring-2 ring-green-400' : (order.status === 'pending' ? 'ring-2 ring-yellow-400' : '')
     }`}>
       {/* Header */}
       <div 

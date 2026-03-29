@@ -33,7 +33,7 @@ export function Header({ cartCount, currentPage, onNavigate, newOrderCount }: He
               className="flex items-center gap-2 hover:opacity-80 transition"
             >
               <span className="text-2xl">🛒</span>
-              <span className="text-xl font-bold text-green-600">FreshCart</span>
+              <span className="text-xl font-bold text-green-600">Al Hadiya Online </span>
             </button>
 
             {/* Desktop Navigation */}

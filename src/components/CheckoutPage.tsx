@@ -12,7 +12,7 @@ interface CheckoutPageProps {
     phone: string;
     location: string;
     notes: string;
-    paymentMethod: 'cash' | 'telebirr';
+    paymentMethod: 'cash' | 'TELESOM';
   }) => void;
   onBack: () => void;
 }
@@ -48,7 +48,7 @@ export function CheckoutPage({ cart, cartTotal, onPlaceOrder, onBack }: Checkout
     return () => { mounted = false; };
   }, [user]);
 
-  const deliveryFee = cartTotal >= 50 ? 0 : 3.99;
+  const deliveryFee = cartTotal >= 100 ? 0 : 3.99;
   const totalWithDelivery = cartTotal + deliveryFee;
 
   const handleGetLocation = async () => {
