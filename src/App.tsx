@@ -46,7 +46,7 @@ function App() {
     phone: string;
     location: string;
     notes: string;
-    paymentMethod: 'cash' | 'Telesom';
+    paymentMethod: 'cash' | 'TELESOM';
   }) => {
     setCustomerPhone(customerData.phone);
     await store.placeOrder(customerData);

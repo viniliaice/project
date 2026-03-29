@@ -171,11 +171,11 @@ export function CheckoutPage({ cart, cartTotal, onPlaceOrder, onBack }: Checkout
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                  placeholder="612345678"
+                  placeholder="634454000"
                   className={`flex-1 px-4 py-3 rounded-r-xl border ${errors.phone ? 'border-red-500' : 'border-gray-200'} focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition`}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Somalia number format: 612345678</p>
+              <p className="text-xs text-gray-500 mt-1">Somalia number format: 634454000</p>
               {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
 
@@ -256,7 +256,7 @@ export function CheckoutPage({ cart, cartTotal, onPlaceOrder, onBack }: Checkout
             </label>
 
             <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition ${
-              paymentMethod === 'telebirr' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+              paymentMethod === 'TELESOM' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'
             }`}>
               <input
                 type="radio"

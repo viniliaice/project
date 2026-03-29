@@ -260,7 +260,7 @@ export function useStore() {
     phone: string;
     location: string;
     notes: string;
-    paymentMethod: 'cash' | 'telebirr';
+    paymentMethod: 'cash' | 'TELESOM';
   }) => {
     const items = cart.map(item => ({
       productId: item.product.id,

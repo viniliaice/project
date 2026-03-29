@@ -43,7 +43,7 @@ export interface Order {
   items: OrderItem[];
   total: number;
   status: OrderStatus;
-  paymentMethod: 'cash' | 'telebirr';
+  paymentMethod: 'cash' | 'TELESOM';
   notes?: string;
   assignedDriver?: {
     name: string;
