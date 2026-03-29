@@ -22,7 +22,7 @@ export function CheckoutPage({ cart, cartTotal, onPlaceOrder, onBack }: Checkout
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'telebirr'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'TELESOM'>('cash');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -261,15 +261,15 @@ export function CheckoutPage({ cart, cartTotal, onPlaceOrder, onBack }: Checkout
               <input
                 type="radio"
                 name="payment"
-                value="telebirr"
-                checked={paymentMethod === 'telebirr'}
-                onChange={() => setPaymentMethod('telebirr')}
+                value="TELESOM"
+                checked={paymentMethod === 'TELESOM'}
+                onChange={() => setPaymentMethod('TELESOM')}
                 className="w-5 h-5 text-green-600"
               />
               <span className="text-2xl">📱</span>
               <div>
                 <p className="font-medium text-gray-800">Mobile Payment</p>
-                <p className="text-xs text-gray-500">Telebirr or similar services</p>
+                <p className="text-xs text-gray-500">TELESOM or similar services</p>
               </div>
             </label>
           </div>
