@@ -57,7 +57,7 @@ export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoad
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-6 md:p-8 mb-6 text-white">
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Welcome to Al Hadiya Online 🛒</h1>
-        <p className="text-green-100 mb-4">Dalbo buuq la aan grocery delivery - fast & fresh!</p>
+        <p className="text-green-100 mb-4">Dalbo Raashinkaaga Order grocery delivery - fast & fresh!</p>
         <div className="flex items-center gap-2 text-sm">
           <span className="bg-white/20 px-3 py-1 rounded-full">✓ Free delivery over $100</span>
           <span className="bg-white/20 px-3 py-1 rounded-full">✓ Cash on delivery</span>
