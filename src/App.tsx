@@ -124,6 +124,7 @@ function App() {
             onUpdateProduct={store.updateProduct}
             onDeleteProduct={store.deleteProduct}
             onUpdateStock={store.updateStock}
+            onRefreshData={async () => { try { await store.refreshProducts(); await store.refreshOrders(); } catch (_) {} }}
           />
         );
       default:

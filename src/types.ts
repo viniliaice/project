@@ -8,6 +8,7 @@ export interface Product {
   stock: number;
   lowStock: number;
   description: string;
+  image?: string;
 }
 
 export interface NewProduct {
@@ -19,6 +20,7 @@ export interface NewProduct {
   stock: number;
   lowStock: number;
   description: string;
+  image?: string;
 }
 
 export interface CartItem {

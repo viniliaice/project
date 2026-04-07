@@ -20,6 +20,7 @@ interface AdminPanelProps {
   onDeleteProduct: (id: string) => void;
   onUpdateStock: (id: string, quantity: number) => void;
   clearNewOrders?: () => void;
+  onRefreshData?: () => void;
 }
 
 type AdminTab = 'orders' | 'products' | 'stock';
@@ -126,11 +127,19 @@ export function AdminPanel({
           <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
           <p className="text-gray-500">Manage orders and inventory</p>
         </div>
-        {pendingCount > 0 && (
-          <div className="bg-red-500 text-white px-4 py-2 rounded-full font-medium animate-pulse">
-            🔔 {pendingCount} new order{pendingCount > 1 ? 's' : ''}!
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { try { onRefreshData && onRefreshData(); } catch (_) {} }}
+            className="bg-white border px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            🔄 Refresh
+          </button>
+          {pendingCount > 0 && (
+            <div className="bg-red-500 text-white px-4 py-2 rounded-full font-medium animate-pulse">
+              🔔 {pendingCount} new order{pendingCount > 1 ? 's' : ''}!
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -521,6 +530,7 @@ function ProductsTab({ products, onAddProduct, onUpdateProduct, onDeleteProduct 
     stock: 0,
     lowStock: 10,
     description: '',
+    image: undefined,
   });
 
   const handleAddProduct = () => {
@@ -649,6 +659,19 @@ function ProductsTab({ products, onAddProduct, onUpdateProduct, onDeleteProduct 
                 className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-green-500 outline-none resize-none"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL (optional)</label>
+              <input
+                type="text"
+                value={newProduct.image || ''}
+                onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value || undefined })}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-green-500 outline-none"
+              />
+              {newProduct.image && (
+                <img src={newProduct.image} alt="preview" className="mt-2 w-24 h-24 object-cover rounded-lg border" />
+              )}
+            </div>
           </div>
           <button
             onClick={handleAddProduct}
@@ -700,6 +723,19 @@ function ProductsTab({ products, onAddProduct, onUpdateProduct, onDeleteProduct 
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL (optional)</label>
+                <input
+                  type="text"
+                  value={(editingProduct.image as string) || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value || undefined })}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-green-500 outline-none"
+                />
+                {(editingProduct.image) && (
+                  <img src={editingProduct.image} alt="preview" className="mt-2 w-24 h-24 object-cover rounded-lg border" />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Low Stock Alert</label>
@@ -755,7 +791,11 @@ function ProductsTab({ products, onAddProduct, onUpdateProduct, onDeleteProduct 
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{product.icon}</span>
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                      ) : (
+                        <span className="text-2xl">{product.icon}</span>
+                      )}
                       <div>
                         <p className="font-medium text-gray-800">{product.name}</p>
                         <p className="text-xs text-gray-500">{product.category}</p>

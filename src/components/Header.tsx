@@ -84,14 +84,29 @@ export function Header({ cartCount, currentPage, onNavigate, newOrderCount }: He
                   >
                     Sign Out
                   </button>
+                  {/* Mobile: show sign out at top */}
+                  <button
+                    onClick={handleSignOut}
+                    className="sm:hidden px-3 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                  >
+                    Sign Out
+                  </button>
                 </>
               ) : (
-                <button
-                  onClick={() => setAuthModalOpen(true)}
-                  className="hidden sm:inline px-4 py-2 text-green-600 hover:bg-green-50 font-medium transition rounded-lg"
-                >
-                  Sign In
-                </button>
+                <>
+                  <button
+                    onClick={() => setAuthModalOpen(true)}
+                    className="hidden sm:inline px-4 py-2 text-green-600 hover:bg-green-50 font-medium transition rounded-lg"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => setAuthModalOpen(true)}
+                    className="sm:hidden px-3 py-2 text-green-600 font-medium"
+                  >
+                    Sign In
+                  </button>
+                </>
               )}
               <button
                 onClick={() => onNavigate('cart')}
@@ -113,6 +128,7 @@ export function Header({ cartCount, currentPage, onNavigate, newOrderCount }: He
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
+          
           <button
             onClick={() => onNavigate('shop')}
             className={`flex flex-col items-center px-4 py-1 ${

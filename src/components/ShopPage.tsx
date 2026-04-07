@@ -14,6 +14,9 @@ interface ShopPageProps {
 export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoading, onNavigate }: ShopPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [imageModal, setImageModal] = useState<{ url: string; name?: string } | null>(null);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
@@ -23,6 +26,13 @@ export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoad
       return matchesSearch && matchesCategory;
     });
   }, [products, searchQuery, selectedCategory]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
 
   const getCartQuantity = (productId: string) => {
     const item = cart.find(c => c.product.id === productId);
@@ -43,7 +53,7 @@ export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoad
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
+    <div className="max-w-7xl mx-auto px-4 py-4 md:py-8 pb-32 md:pb-12">
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-6 md:p-8 mb-6 text-white">
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Welcome to Al Hadiya Online 🛒</h1>
@@ -90,17 +100,67 @@ export function ShopPage({ products, cart, onAddToCart, onUpdateQuantity, isLoad
           <p className="text-gray-500">No products found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredProducts.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              cartQuantity={getCartQuantity(product.id)}
-              onAddToCart={() => onAddToCart(product)}
-              onUpdateQuantity={(qty) => onUpdateQuantity(product.id, qty)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {paginatedProducts.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                cartQuantity={getCartQuantity(product.id)}
+                onAddToCart={() => onAddToCart(product)}
+                onUpdateQuantity={(qty) => onUpdateQuantity(product.id, qty)}
+                onImageClick={() => product.image && setImageModal({ url: product.image, name: product.name })}
+              />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-6">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded bg-white border hover:bg-gray-50 disabled:opacity-50"
+              >
+                ← Prev
+              </button>
+              <div className="text-sm text-gray-600">Page {currentPage} of {totalPages}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Per page:</label>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value)); setCurrentPage(1); }}
+                className="px-2 py-1 rounded border"
+              >
+                <option value={6}>6</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+              </select>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded bg-white border hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+
+          {/* Image Modal */}
+          {imageModal && (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setImageModal(null)}>
+              <div className="bg-white rounded-lg overflow-hidden max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+                <div className="p-4 text-right">
+                  <button onClick={() => setImageModal(null)} className="text-gray-600">Close</button>
+                </div>
+                <div className="w-full h-96 bg-black flex items-center justify-center">
+                  <img src={imageModal.url} alt={imageModal.name || 'Product'} className="max-h-full object-contain" />
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Floating Cart Bar */}
@@ -128,17 +188,26 @@ interface ProductCardProps {
   cartQuantity: number;
   onAddToCart: () => void;
   onUpdateQuantity: (quantity: number) => void;
+  onImageClick?: () => void;
 }
 
-function ProductCard({ product, cartQuantity, onAddToCart, onUpdateQuantity }: ProductCardProps) {
+function ProductCard({ product, cartQuantity, onAddToCart, onUpdateQuantity, onImageClick }: ProductCardProps) {
   const isOutOfStock = product.stock === 0;
   const isLowStock = product.stock > 0 && product.stock <= product.lowStock;
 
   return (
     <div className={`bg-white rounded-xl shadow-sm overflow-hidden transition hover:shadow-md ${isOutOfStock ? 'opacity-60' : ''}`}>
       {/* Product Image/Icon */}
-      <div className="relative bg-gray-50 p-4 flex items-center justify-center h-28">
-        <span className="text-5xl">{product.icon}</span>
+      <div className="relative bg-gray-50 p-0 flex items-center justify-center overflow-hidden" style={{ aspectRatio: '4/3' }}>
+        {product.image ? (
+          <button onClick={onImageClick} className="absolute inset-0 w-full h-full">
+            <img src={product.image} alt={product.name} className="w-full h-full object-cover object-center" />
+          </button>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-5xl">{product.icon}</span>
+          </div>
+        )}
         {isOutOfStock && (
           <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">

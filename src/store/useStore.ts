@@ -53,18 +53,34 @@ export function useStore() {
     stock: p.stock,
     lowStock: p.low_stock ?? p.lowStock ?? 0,
     description: p.description ?? '',
+    image: p.image_url ?? p.image ?? undefined,
   });
+
+  const refreshProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('products').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      const mapped = (data || []).map(mapDbProduct);
+      setProducts(mapped);
+      return data || [];
+    } catch (err) {
+      console.error('refreshProducts failed', err);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     const initializeStore = async () => {
       try {
-        const { data, error } = await supabase.from('products').select('*');
+        // Refresh products; if empty seed initialProducts only on first run
+        const existing = await refreshProducts();
 
-        if (error) throw error;
+        const seededFlagKey = 'grocery:productsSeeded';
+        const alreadySeeded = typeof window !== 'undefined' && !!localStorage.getItem(seededFlagKey);
 
-        if (!data || data.length === 0) {
-          await supabase.from('products').insert(
-            initialProducts.map(p => ({
+        if ((existing === null || existing.length === 0) && !alreadySeeded) {
+          const payloads = initialProducts.map(p => {
+            const px: any = {
               name: p.name,
               price: p.price,
               icon: p.icon,
@@ -73,12 +89,29 @@ export function useStore() {
               stock: p.stock,
               low_stock: p.lowStock,
               description: p.description || '',
-            }))
-          );
-          const { data: newProducts } = await supabase.from('products').select('*');
-          setProducts((newProducts || []).map(mapDbProduct));
-        } else {
-          setProducts(data.map(mapDbProduct));
+            };
+            if ((p as any).image) px.image_url = (p as any).image;
+            return px;
+          });
+
+          try {
+            await supabase.from('products').insert(payloads);
+          } catch (err: any) {
+            if (err?.code === 'PGRST204' || /image_url/.test(String(err?.message))) {
+              // retry without image_url
+              const stripped = payloads.map(({ image_url, ...rest }) => rest);
+              try { await supabase.from('products').insert(stripped); } catch (e) { console.error('Failed seeding products after stripping image_url:', e); }
+            } else {
+              console.error('Failed seeding products:', err);
+            }
+          }
+
+          // mark seeded so we don't reseed when user intentionally clears DB later
+          try {
+            if (typeof window !== 'undefined') localStorage.setItem(seededFlagKey, '1');
+          } catch (_) {}
+
+          await refreshProducts();
         }
 
         // Load orders using refreshOrders so it can be reused elsewhere
@@ -315,6 +348,26 @@ export function useStore() {
     setLastOrder(newOrder);
     clearCart();
 
+    // Decrement stock for each ordered item (best-effort).
+    (async () => {
+      try {
+        for (const it of items) {
+          try {
+            // calculate new stock locally
+            const newStock = Math.max(0, (it.stock || 0) - it.quantity);
+            await supabase
+              .from('products')
+              .update({ stock: newStock, updated_at: new Date().toISOString() })
+              .eq('id', it.productId);
+            // optimistic local update
+            setProducts(prev => prev.map(p => p.id === it.productId ? { ...p, stock: newStock } : p));
+          } catch (err) {
+            console.warn('Failed to decrement stock for', it.productId, err);
+          }
+        }
+      } catch (_) {}
+    })();
+
     return data.id;
   }, [cart, getCartTotal, clearCart]);
 
@@ -390,42 +443,68 @@ export function useStore() {
   }, []);
 
   const addProduct = useCallback(async (product: Omit<Product, 'id'>) => {
-    const { data, error } = await supabase
-      .from('products')
-      .insert({
-        name: product.name,
-        price: product.price,
-        icon: product.icon,
-        category: product.category,
-        unit: product.unit,
-        stock: product.stock,
-        low_stock: product.lowStock,
-        description: product.description || '',
-      })
-      .select()
-      .single();
+    const payload: any = {
+      name: product.name,
+      price: product.price,
+      icon: product.icon,
+      category: product.category,
+      unit: product.unit,
+      stock: product.stock,
+      low_stock: product.lowStock,
+      description: product.description || '',
+    };
+    if ((product as any).image) payload.image_url = (product as any).image;
 
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.from('products').insert(payload).select().single();
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      // If image_url column doesn't exist, retry without it
+      if (err?.code === 'PGRST204' || /image_url/.test(String(err?.message))) {
+        try {
+          delete payload.image_url;
+          const { data, error: e2 } = await supabase.from('products').insert(payload).select().single();
+          if (e2) throw e2;
+          return data;
+        } catch (e) {
+          throw e;
+        }
+      }
+      throw err;
+    }
   }, []);
 
   const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name: updates.name,
-        price: updates.price,
-        icon: updates.icon,
-        category: updates.category,
-        unit: updates.unit,
-        stock: updates.stock,
-        low_stock: updates.lowStock,
-        description: updates.description,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+    const payload: any = {
+      name: updates.name,
+      price: updates.price,
+      icon: updates.icon,
+      category: updates.category,
+      unit: updates.unit,
+      stock: updates.stock,
+      low_stock: updates.lowStock,
+      description: updates.description,
+      updated_at: new Date().toISOString(),
+    };
+    if ((updates as any).image !== undefined) payload.image_url = (updates as any).image;
 
-    if (error) throw error;
+    try {
+      const { error } = await supabase.from('products').update(payload).eq('id', id);
+      if (error) throw error;
+    } catch (err: any) {
+      if (err?.code === 'PGRST204' || /image_url/.test(String(err?.message))) {
+        try {
+          delete payload.image_url;
+          const { error: e2 } = await supabase.from('products').update(payload).eq('id', id);
+          if (e2) throw e2;
+          return;
+        } catch (e) {
+          throw e;
+        }
+      }
+      throw err;
+    }
   }, []);
 
   const deleteProduct = useCallback(async (id: string) => {
@@ -487,5 +566,6 @@ export function useStore() {
     getNewOrdersCount,
     clearNewOrders,
     refreshOrders,
+    refreshProducts,
   };
 }
